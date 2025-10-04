@@ -1,113 +1,120 @@
-""" Includes gemini chatbot integration"""
-import os
+# Add these methods to your backend/chatbot.py
+
 import google.generativeai as genai
-from dotenv import load_dotenv
-from .screenshot import get_recent_screenshots, get_screenshot_by_id, get_screenshot_stats
-from .game_detection import detect_current_game
-from .vector_service import search_knowledge
+from PIL import Image
+import io
 import base64
-import json
-system_prompt_file = open("PROMPTS.txt","r")
-system_prompt = system_prompt_file.read()
-load_dotenv()
+import os
+from pathlib import Path
 
-# Configure Gemini
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'),)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite",system_instruction=system_prompt)
-
-def set_api_key(new_key: str):
-    """Update the Google API key at runtime and reinitialize the model."""
-    try:
-        if not new_key:
-            raise ValueError("Empty API key")
-        os.environ['GOOGLE_API_KEY'] = new_key
-        genai.configure(api_key=new_key)
-        global model
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite", system_instruction=system_prompt)
-        return True
-    except Exception as e:
-        print(f"Error setting API key: {e}")
-        return False
-
-async def chat_with_gemini(message: str, image_data: str = None):
-    try:
-        # Detect current game
-        detected_game = detect_current_game(message)
+class ChatbotService:
+    def __init__(self):
+        self.api_key = None
+        self.model = None
+        self._load_api_key()
+        self._initialize_model()
+    
+    def _load_api_key(self):
+        """Load API key from .env file"""
+        env_path = Path(".env")
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('GEMINI_API_KEY='):
+                        self.api_key = line.split('=', 1)[1].strip()
+                        break
         
-        # If image data is provided, use vision capabilities
-        if image_data:
-            import PIL.Image
-            import io
-            
-            # Decode base64 image
-            image_bytes = base64.b64decode(image_data)
-            image = PIL.Image.open(io.BytesIO(image_bytes))
-            
-            # Enhanced message for image analysis
-            enhanced_message = f"""
-            {message}
-            
-            LIVE SCREENSHOT PROVIDED: I can see a screenshot that the user just captured. 
-            Please analyze this image in the context of gaming and provide specific, actionable advice based on what you can see.
-            Focus on game mechanics, strategies, UI elements, or any gaming-related aspects visible in the screenshot.
-            """
-            
-            # Add game context if detected
-            if detected_game:
-                enhanced_message += f"\n\nDETECTED GAME: {detected_game.upper()}"
-            
-            # Generate content with image
-            response = model.generate_content([enhanced_message, image])
-            return {"response": response.text}
-        
-        # Check if user is asking about screenshots (existing functionality)
-        screenshot_keywords = ['screenshot', 'screen', 'capture', 'git', 'visual', 'see', 'show me']
-        if any(keyword in message.lower() for keyword in screenshot_keywords):
-            # Get recent screenshots
-            recent_screenshots = get_recent_screenshots(limit=5)
-            screenshot_stats = get_screenshot_stats()
-            
-            # Prepare screenshot context
-            screenshot_context = f"""
-            SCREENSHOT DATA AVAILABLE:
-            - Total screenshots stored: {screenshot_stats['total_screenshots']}
-            - Recent applications captured: {[app[0] for app in screenshot_stats['applications'][:5]]}
-            - Recent screenshots: {recent_screenshots}
-            
-            You can analyze these screenshots to help with gaming-related questions. 
-            The screenshots are automatically captured and show what applications the user was using.
-            """
-            
-            # Add screenshot context to the message
-            enhanced_message = f"{message}\n\n{screenshot_context}"
-            response = model.generate_content(enhanced_message)
-            return {"response": response.text}
+        # Fallback to environment variable
+        if not self.api_key:
+            self.api_key = os.getenv('GEMINI_API_KEY')
+    
+    def _initialize_model(self):
+        """Initialize the Gemini model"""
+        if self.api_key:
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                print("Gemini model initialized successfully")
+            except Exception as e:
+                print(f"Error initializing Gemini model: {e}")
+                self.model = None
         else:
-            # Enhanced chat with game knowledge
-            enhanced_message = message
+            print("No API key found. Please configure in settings.")
+    
+    def is_api_key_configured(self):
+        """Check if API key is configured"""
+        return self.api_key is not None and len(self.api_key) > 0
+    
+    def get_api_key_preview(self):
+        """Get masked preview of API key"""
+        return self.api_key if self.api_key else ""
+    
+    def reconfigure_api_key(self, api_key: str):
+        """Reconfigure with new API key"""
+        self.api_key = api_key
+        self._initialize_model()
+    
+    def generate_response(self, prompt: str, context: str = ""):
+        """Generate a text-only response"""
+        if not self.model:
+            return "Error: AI model not initialized. Please configure your API key in settings."
+        
+        try:
+            # Load system prompt
+            system_prompt = self._load_system_prompt()
             
-            # Add game context and knowledge if detected
-            if detected_game:
-                enhanced_message += f"\n\nDETECTED GAME: {detected_game.upper()}"
-                
-                # Search for relevant knowledge
-                try:
-                    knowledge_results = search_knowledge(detected_game, message, limit=3)
-                    
-                    if knowledge_results:
-                        knowledge_context = "\n\nRELEVANT KNOWLEDGE FROM GAME DATABASE:\n"
-                        for i, result in enumerate(knowledge_results, 1):
-                            knowledge_context += f"\n{i}. {result['metadata'].get('title', 'Unknown Title')}\n"
-                            knowledge_context += f"   Source: {result['metadata'].get('content_type', 'unknown').upper()}\n"
-                            knowledge_context += f"   Content: {result['content'][:200]}...\n"
-                            knowledge_context += f"   URL: {result['metadata'].get('url', 'N/A')}\n"
-                        
-                        enhanced_message += knowledge_context
-                except Exception as e:
-                    print(f"Error searching knowledge: {e}")
+            # Combine prompts
+            full_prompt = f"{system_prompt}\n\n"
+            if context:
+                full_prompt += f"RETRIEVED CONTEXT:\n{context}\n\n"
+            full_prompt += f"USER: {prompt}\n\nASSISTANT:"
             
-            response = model.generate_content(enhanced_message)
-            return {"response": response.text}
-    except Exception as e:
-        print(e)
-        return {"response": f"Error processing request: {str(e)}"}
+            # Generate response
+            response = self.model.generate_content(full_prompt)
+            return response.text
+            
+        except Exception as e:
+            return f"Error generating response: {str(e)}"
+    
+    def generate_response_with_image(self, prompt: str, image_data: str, context: str = ""):
+        """Generate response with image analysis"""
+        if not self.model:
+            return "Error: AI model not initialized. Please configure your API key in settings."
+        
+        try:
+            # Decode base64 image
+            img_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(img_bytes))
+            
+            # Load system prompt
+            system_prompt = self._load_system_prompt()
+            
+            # Combine prompts
+            full_prompt = f"{system_prompt}\n\n"
+            if context:
+                full_prompt += f"RETRIEVED CONTEXT:\n{context}\n\n"
+            full_prompt += f"USER: {prompt}\n\n"
+            full_prompt += "The user has provided a screenshot. Please analyze it and provide relevant insights.\n\n"
+            full_prompt += "ASSISTANT:"
+            
+            # Generate response with image
+            response = self.model.generate_content([full_prompt, image])
+            return response.text
+            
+        except Exception as e:
+            return f"Error generating response with image: {str(e)}"
+    
+    def _load_system_prompt(self):
+        """Load system prompt from PROMPTS.txt"""
+        try:
+            with open('PROMPTS.txt', 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return """You are Pixly, a helpful gaming assistant. You provide expert advice on games, 
+analyze screenshots, and help users improve their gameplay. Always be friendly, concise, 
+and focused on gaming topics. When analyzing screenshots, describe what you see and 
+provide relevant tips or insights."""
+
+# Initialize the service
+chatbot = ChatbotService()

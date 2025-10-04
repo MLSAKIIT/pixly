@@ -1,0 +1,30 @@
+# Core dependencies
+fastapi
+uvicorn
+pydantic
+
+# AI and ML
+google-generativeai
+chromadb
+sentence-transformers
+
+# UI
+customtkinter
+Pillow
+PyGetWindow
+
+# Screenshot and system
+keyboard
+psutil
+pywin32
+
+# Security
+cryptography
+
+# Data processing
+requests
+pandas
+
+# Testing
+pytest
+pytest-asyncio

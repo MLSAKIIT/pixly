@@ -1,7 +1,8 @@
 """Game detection using process id, screenshots and user query"""
 import psutil
 from typing import Optional, Dict, List
-from .screenshot import get_recent_screenshots
+# NEW (correct):
+from .screenshot import screenshot_service
 
 class GameDetection:
     def __init__(self):
@@ -53,9 +54,9 @@ class GameDetection:
     def detect_game_from_screenshots(self) -> Optional[str]:
         """Detect game from recent screenshots."""
         try:
-            recent_screenshots = get_recent_screenshots(limit=5)
+            recent = screenshot_service.get_recent_screenshots(limit=5)
             
-            for screenshot in recent_screenshots:
+            for screenshot in recent:
                 app_name = screenshot[2].lower()  # application name
                 window_title = screenshot[3].lower() if screenshot[3] else ""  # window title
                 
@@ -161,3 +162,7 @@ def get_available_games() -> List[str]:
     """Get list of available games for detection."""
     return game_detector.get_available_games()
 
+# At the END of backend/game_detection.py
+
+# Initialize the service
+game_detection = GameDetection()

@@ -10,6 +10,10 @@ from tkinter import filedialog
 import os
 import json
 from PIL import Image
+import base64
+import io
+from PIL import ImageGrab, ImageTk
+
 class ChatWindow(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -50,6 +54,11 @@ class ChatWindow(ctk.CTkFrame):
         )
         self.typing_label.pack(fill="x", padx=12)
         
+        # Screenshot preview area (hidden by default)
+        self.preview_frame = ctk.CTkFrame(self)
+        self.preview_image_data = None
+        self.preview_label = None
+        
         # Input area container frame
         self.bottom_frame = ctk.CTkFrame(self)
         self.bottom_frame.pack(fill="x", padx=10, pady=10, side="bottom")
@@ -57,28 +66,41 @@ class ChatWindow(ctk.CTkFrame):
         # Message input
         self.message_input = ctk.CTkEntry(
             self.bottom_frame,
-            placeholder_text="Type your message or screenshot analysis prompt...",
+            placeholder_text="Type your message...",
             height=40,
             font=ctk.CTkFont(size=12)
         )
         self.message_input.pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        # Screenshot button
+        # Screenshot buttons container
+        self.screenshot_buttons_frame = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        self.screenshot_buttons_frame.pack(side="right")
+        
+        # New screenshot button
         self.screenshot_button = ctk.CTkButton(
-            self.bottom_frame,
+            self.screenshot_buttons_frame,
             text="📷",
             width=50,
             height=40,
             font=ctk.CTkFont(size=16),
-            command=self.send_screenshot_message,
+            command=self.capture_new_screenshot,
             fg_color="#4467C4",
             hover_color="#365A9D"
         )
-        self.screenshot_button.pack(side="right", padx=(10, 0))
+        self.screenshot_button.pack(side="left", padx=(0, 5))
         
-        # Add tooltip-like behavior for screenshot button
-        self.screenshot_button.bind("<Enter>", self.on_screenshot_hover)
-        self.screenshot_button.bind("<Leave>", self.on_screenshot_leave)
+        # Existing screenshot button
+        self.existing_screenshot_button = ctk.CTkButton(
+            self.screenshot_buttons_frame,
+            text="🖼️",
+            width=50,
+            height=40,
+            font=ctk.CTkFont(size=16),
+            command=self.select_existing_screenshot,
+            fg_color="#6A4C93",
+            hover_color="#533A71"
+        )
+        self.existing_screenshot_button.pack(side="left", padx=(0, 10))
         
         # Send button
         self.send_button = ctk.CTkButton(
@@ -91,25 +113,139 @@ class ChatWindow(ctk.CTkFrame):
         )
         self.send_button.pack(side="right")
         
-        # Back button
-        
-        # self.back_button.pack(padx=10, pady=5, anchor="w")
-        
         # Bind Enter key
         self.message_input.bind("<Return>", lambda e: self.send_message())
                 
         # Welcome message
         self.chat_text.insert("end", "💡 Tips:\n")
-        self.chat_text.insert("end", "• Type a custom prompt, then click 📷 to analyze screenshots\n")
-        self.chat_text.insert("end", "• Use quick prompts below or create your own\n")
-        self.chat_text.insert("end", "• Leave message empty for default screenshot analysis prompt.\n\n")
+        self.chat_text.insert("end", "• 📷 Capture new screenshot with custom prompt\n")
+        self.chat_text.insert("end", "• 🖼️ Select from existing screenshots\n")
+        self.chat_text.insert("end", "• Edit your prompt before sending\n\n")
         self.chat_text.insert("end", "Pixly: Hello! How can I help you today?\n\n")
-        self.chat_text.configure(state="disabled")  # Make read-only initially
+        self.chat_text.configure(state="disabled")
+
+    def capture_new_screenshot(self):
+        """Capture a new screenshot and show preview with editable prompt."""
+        try:
+            # Capture screenshot
+            screenshot = ImageGrab.grab()
+            
+            # Convert to base64
+            buffer = io.BytesIO()
+            screenshot.save(buffer, format='PNG')
+            self.preview_image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Show preview
+            self.show_screenshot_preview(screenshot)
+            
+            # Set default prompt if empty
+            if not self.message_input.get().strip():
+                self.message_input.delete(0, "end")
+                self.message_input.insert(0, "Analyze this screenshot and provide insights.")
+            
+            self.message_input.focus()
+            
+        except Exception as e:
+            self.add_system_message(f"Error capturing screenshot: {str(e)}")
+
+    def select_existing_screenshot(self):
+        """Open dialog to select from existing screenshots."""
+        try:
+            response = requests.get("http://127.0.0.1:8000/screenshots/recent", params={"limit": 50})
+            if response.status_code == 200:
+                screenshots = response.json()['screenshots']
+                if screenshots:
+                    self.open_screenshot_selector(screenshots)
+                else:
+                    self.add_system_message("No screenshots available. Capture some first!")
+            else:
+                self.add_system_message("Failed to load screenshots")
+        except Exception as e:
+            self.add_system_message(f"Error loading screenshots: {str(e)}")
+
+    def open_screenshot_selector(self, screenshots):
+        """Open a dialog to select a screenshot."""
+        selector = ScreenshotSelector(self, screenshots, self.on_screenshot_selected)
+
+    def on_screenshot_selected(self, screenshot_id):
+        """Handle screenshot selection."""
+        try:
+            response = requests.get(f"http://127.0.0.1:8000/screenshots/{screenshot_id}")
+            if response.status_code == 200:
+                data = response.json()
+                self.preview_image_data = data['data']
+                
+                # Decode and show preview
+                image_bytes = base64.b64decode(self.preview_image_data)
+                image = Image.open(io.BytesIO(image_bytes))
+                self.show_screenshot_preview(image)
+                
+                # Set default prompt if empty
+                if not self.message_input.get().strip():
+                    self.message_input.delete(0, "end")
+                    self.message_input.insert(0, "Analyze this screenshot and provide insights.")
+                
+                self.message_input.focus()
+            else:
+                self.add_system_message("Failed to load screenshot")
+        except Exception as e:
+            self.add_system_message(f"Error loading screenshot: {str(e)}")
+
+    def show_screenshot_preview(self, image):
+        """Show screenshot preview with option to remove."""
+        # Create preview frame if it doesn't exist
+        if self.preview_label is None:
+            self.preview_frame.pack(fill="x", padx=10, pady=(0, 5), before=self.bottom_frame)
+            
+            # Resize image for preview
+            image_copy = image.copy()
+            image_copy.thumbnail((200, 150), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(image_copy)
+            
+            self.preview_label = tk.Label(self.preview_frame, image=photo, bg="#2b2b2b")
+            self.preview_label.image = photo
+            self.preview_label.pack(side="left", padx=5, pady=5)
+            
+            # Info label
+            info_label = ctk.CTkLabel(
+                self.preview_frame,
+                text="Screenshot attached\nEdit prompt and press Send",
+                font=ctk.CTkFont(size=11)
+            )
+            info_label.pack(side="left", padx=10)
+            
+            # Remove button
+            remove_btn = ctk.CTkButton(
+                self.preview_frame,
+                text="✕",
+                width=30,
+                height=30,
+                command=self.remove_screenshot_preview,
+                fg_color="red",
+                hover_color="darkred"
+            )
+            remove_btn.pack(side="right", padx=5, pady=5)
+
+    def remove_screenshot_preview(self):
+        """Remove screenshot preview."""
+        self.preview_image_data = None
+        if self.preview_label:
+            self.preview_frame.pack_forget()
+            for widget in self.preview_frame.winfo_children():
+                widget.destroy()
+            self.preview_label = None
 
     def send_message(self):
         message = self.message_input.get().strip()
-        if message:
-            # Add user message
+        
+        # Check if there's a screenshot attached
+        if self.preview_image_data:
+            if not message:
+                self.add_system_message("Please enter a prompt for the screenshot analysis.")
+                return
+            self.send_screenshot_message(message)
+        elif message:
+            # Regular text message
             self.add_user_message(message)
             self.message_input.delete(0, "end")
             
@@ -117,6 +253,7 @@ class ChatWindow(ctk.CTkFrame):
             self.message_input.configure(state="disabled")
             self.send_button.configure(state="disabled")
             self.screenshot_button.configure(state="disabled")
+            self.existing_screenshot_button.configure(state="disabled")
             
             # Show typing indicator and send to backend
             self.start_typing()
@@ -125,6 +262,29 @@ class ChatWindow(ctk.CTkFrame):
                 args=(message,),
                 daemon=True
             ).start()
+
+    def send_screenshot_message(self, message):
+        """Send message with screenshot to backend."""
+        self.add_user_message(f"{message} [📷 Screenshot attached]")
+        self.message_input.delete(0, "end")
+        
+        # Disable input while processing
+        self.message_input.configure(state="disabled")
+        self.send_button.configure(state="disabled")
+        self.screenshot_button.configure(state="disabled")
+        self.existing_screenshot_button.configure(state="disabled")
+        
+        self.start_typing()
+        
+        # Send to backend
+        image_data = self.preview_image_data
+        self.remove_screenshot_preview()
+        
+        threading.Thread(
+            target=self.get_response,
+            args=(message, image_data),
+            daemon=True
+        ).start()
 
     def get_response(self, message, image_data=None):
         try:
@@ -161,9 +321,19 @@ class ChatWindow(ctk.CTkFrame):
     def add_assistant_message(self, text):
         self.chat_text.configure(state="normal")
         try:
-            self.chat_text.insert("end", "Pixly : ", "assistant")
+            self.chat_text.insert("end", "Pixly: ", "assistant")
         except Exception:
-            self.chat_text.insert("end", "Pixly : ")
+            self.chat_text.insert("end", "Pixly: ")
+        self.chat_text.insert("end", f"{text}\n\n")
+        self.chat_text.see("end")
+        self.chat_text.configure(state="disabled")
+
+    def add_system_message(self, text):
+        self.chat_text.configure(state="normal")
+        try:
+            self.chat_text.insert("end", "System: ", "system")
+        except Exception:
+            self.chat_text.insert("end", "System: ")
         self.chat_text.insert("end", f"{text}\n\n")
         self.chat_text.see("end")
         self.chat_text.configure(state="disabled")
@@ -191,76 +361,9 @@ class ChatWindow(ctk.CTkFrame):
         self.message_input.configure(state="normal")
         self.send_button.configure(state="normal")
         self.screenshot_button.configure(state="normal")
-        self.message_input.focus()  # Focus back to input
-    
-    def send_screenshot_message(self):
-        """Capture a screenshot and send it with the current message to AI for analysis."""
-        message = self.message_input.get().strip()
-        using_default = False
-        
-        if not message:
-            message = "Please analyze this screenshot and provide gaming advice based on what you see."
-            using_default = True
-        
-        # Add visual feedback with better indication of prompt source
-        self.chat_text.configure(state="normal")
-        if using_default:
-            self.add_user_message(f"[📷 Screenshot] {message}")
-        else:
-            self.add_user_message(f"{message} [📷 Screenshot attached]")
-        
-        self.start_typing()
-        self.message_input.delete(0, "end")
-        
-        # Reset placeholder text
-        self.message_input.configure(placeholder_text="Type your message or screenshot analysis prompt...")
-        
-        # Disable input while processing
-        self.message_input.configure(state="disabled")
-        self.send_button.configure(state="disabled")
-        self.screenshot_button.configure(state="disabled")
-        
-        # Capture screenshot and send to backend
-        threading.Thread(
-            target=self.capture_and_send_screenshot,
-            args=(message,),
-            daemon=True
-        ).start()
-    
-    def capture_and_send_screenshot(self, message):
-        """Capture screenshot and send to backend."""
-        try:
-            import base64
-            import io
-            from PIL import ImageGrab
-            
-            # Capture screenshot
-            screenshot = ImageGrab.grab()
-            
-            # Convert to base64
-            buffer = io.BytesIO()
-            screenshot.save(buffer, format='PNG')
-            img_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            # Send to backend with image data
-            self.get_response(message, img_data)
-            
-        except Exception as e:
-            self.after(0, self.update_chat, f"Error capturing screenshot: {str(e)}")
-            self.after(0, self.enable_input)
-    
-    def on_screenshot_hover(self, event):
-        """Show helpful text when hovering over screenshot button."""
-        current_text = self.message_input.get().strip()
-        if not current_text:
-            self.message_input.configure(placeholder_text="Enter custom prompt for screenshot analysis...")
-    
-    def on_screenshot_leave(self, event):
-        """Reset placeholder text when leaving screenshot button."""
-        current_text = self.message_input.get().strip()
-        if not current_text:
-            self.message_input.configure(placeholder_text="Type your message or screenshot analysis prompt...")
-    
+        self.existing_screenshot_button.configure(state="normal")
+        self.message_input.focus()
+
     def set_prompt(self, prompt):
         """Set a quick prompt in the message input."""
         self.message_input.delete(0, "end")
@@ -270,6 +373,62 @@ class ChatWindow(ctk.CTkFrame):
     def return_to_menu(self):
         if hasattr(self.master.master, "show_buttons"):
             self.master.master.show_buttons()
+
+
+class ScreenshotSelector(ctk.CTkToplevel):
+    """Dialog for selecting an existing screenshot."""
+    def __init__(self, parent, screenshots, callback):
+        super().__init__(parent)
+        
+        self.callback = callback
+        self.title("Select Screenshot")
+        self.geometry("800x600")
+        
+        # Title
+        title_label = ctk.CTkLabel(
+            self,
+            text="Select a Screenshot",
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        title_label.pack(pady=10)
+        
+        # Screenshot list
+        self.screenshot_list = ctk.CTkScrollableFrame(self)
+        self.screenshot_list.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Display screenshots
+        for i, screenshot in enumerate(screenshots):
+            self.create_screenshot_item(screenshot, i)
+
+    def create_screenshot_item(self, screenshot, index):
+        """Create a screenshot item in the selector."""
+        item_frame = ctk.CTkFrame(self.screenshot_list)
+        item_frame.pack(fill="x", pady=5)
+        
+        # Screenshot info
+        info_text = f"ID: {screenshot[0]} | App: {screenshot[2]} | Time: {screenshot[1]}"
+        info_label = ctk.CTkLabel(
+            item_frame,
+            text=info_text,
+            font=ctk.CTkFont(size=12)
+        )
+        info_label.pack(side="left", padx=10, pady=10)
+        
+        # Select button
+        select_btn = ctk.CTkButton(
+            item_frame,
+            text="Select",
+            command=lambda: self.select_screenshot(screenshot[0]),
+            width=80,
+            fg_color="#4467C4"
+        )
+        select_btn.pack(side="right", padx=10, pady=10)
+
+    def select_screenshot(self, screenshot_id):
+        """Select a screenshot and close dialog."""
+        self.callback(screenshot_id)
+        self.destroy()
+
 
 class SettingsWindow(ctk.CTkFrame):
     def __init__(self, parent):
@@ -293,13 +452,22 @@ class SettingsWindow(ctk.CTkFrame):
         # Fetch API key status (non-blocking)
         threading.Thread(target=self.fetch_api_key_status, daemon=True).start()
         
+        # Auto-capture section
+        self.auto_capture_label = ctk.CTkLabel(
+            self.settings_container,
+            text="Automatic Screenshot Capture",
+            font=ctk.CTkFont(size=15, weight="bold"),
+            text_color=("#4467C4", "#82B1FF")
+        )
+        self.auto_capture_label.pack(pady=(5, 10))
+        
         # Screenshot toggle
         self.toggle_frame = ctk.CTkFrame(self.settings_container)
         self.toggle_frame.pack(fill="x", pady=5)
         
         self.toggle_label = ctk.CTkLabel(
             self.toggle_frame,
-            text="Enable Screenshot Capture",
+            text="Enable Auto-Capture",
             font=ctk.CTkFont(size=14, weight="bold")
         )
         self.toggle_label.pack(side="left", padx=10, pady=10)
@@ -330,6 +498,24 @@ class SettingsWindow(ctk.CTkFrame):
         )
         self.interval_entry.pack(side="right", padx=10, pady=10)
         self.interval_entry.insert(0, str(self.settings.get('interval', 30)))
+        
+        # Analysis toggle
+        self.analysis_frame = ctk.CTkFrame(self.settings_container)
+        self.analysis_frame.pack(fill="x", pady=5)
+        
+        self.analysis_label = ctk.CTkLabel(
+            self.analysis_frame,
+            text="Auto-Analyze Screenshots",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        self.analysis_label.pack(side="left", padx=10, pady=10)
+        
+        self.analysis_switch = ctk.CTkSwitch(
+            self.analysis_frame,
+            text=""
+        )
+        self.analysis_switch.pack(side="right", padx=10, pady=10)
+        self.analysis_switch.select() if self.settings.get('auto_analyze', True) else None
         
         # Folder selection
         self.folder_frame = ctk.CTkFrame(self.settings_container)
@@ -411,8 +597,6 @@ class SettingsWindow(ctk.CTkFrame):
             fg_color="green"
         )
         self.save_button.pack(fill="x", padx=10, pady=10)
-        
-        # Back button
 
     def load_settings(self):
         """Load settings from file."""
@@ -420,7 +604,8 @@ class SettingsWindow(ctk.CTkFrame):
         default_settings = {
             'enabled': False,
             'interval': 30,
-            'folder': './screenshots'
+            'folder': './screenshots',
+            'auto_analyze': True
         }
         
         if os.path.exists(settings_file):
@@ -443,7 +628,6 @@ class SettingsWindow(ctk.CTkFrame):
                 else:
                     self.api_key_entry.configure(placeholder_text="Enter or paste your API key")
         except Exception:
-            # Silent fail; keep default placeholder
             pass
     
     def save_settings(self):
@@ -453,6 +637,7 @@ class SettingsWindow(ctk.CTkFrame):
         # Get current settings from UI
         self.settings['enabled'] = self.toggle_switch.get() == 1
         self.settings['interval'] = int(self.interval_entry.get() or 30)
+        self.settings['auto_analyze'] = self.analysis_switch.get() == 1
         
         # Save to file
         with open(settings_file, 'w') as f:
@@ -496,7 +681,10 @@ class SettingsWindow(ctk.CTkFrame):
                 # Start screenshot capture
                 response = requests.post(
                     "http://127.0.0.1:8000/screenshots/start",
-                    params={"interval": self.settings['interval']}
+                    params={
+                        "interval": self.settings['interval'],
+                        "auto_analyze": self.settings['auto_analyze']
+                    }
                 )
                 if response.status_code == 200:
                     print("Screenshot capture started")
@@ -545,7 +733,6 @@ class SettingsWindow(ctk.CTkFrame):
     
     def show_message(self, message):
         """Show a temporary message."""
-        # Create a temporary label for the message
         msg_label = ctk.CTkLabel(
             self,
             text=message,
@@ -554,13 +741,12 @@ class SettingsWindow(ctk.CTkFrame):
             corner_radius=15
         )
         msg_label.pack(pady=5)
-        
-        # Remove after 3 seconds
         self.after(3000, lambda: msg_label.destroy())
     
     def return_to_menu(self):
         if hasattr(self.master.master, "show_buttons"):
             self.master.master.show_buttons()
+
 
 class ScreenshotViewer(ctk.CTkToplevel):
     def __init__(self, parent, screenshots):
@@ -630,9 +816,9 @@ class ScreenshotViewer(ctk.CTkToplevel):
                     detail = resp.json().get('detail', 'Failed to delete screenshot')
                 except Exception:
                     detail = 'Failed to delete screenshot'
-                self.show_message(detail)
+                print(detail)
         except Exception as e:
-            self.show_message(f"Error: {str(e)}")
+            print(f"Error: {str(e)}")
     
     def view_screenshot(self, screenshot_id):
         """View a specific screenshot in a new window."""
@@ -649,10 +835,6 @@ class ScreenshotViewer(ctk.CTkToplevel):
     
     def open_image_viewer(self, image_data, screenshot_id):
         """Open a new window to view the actual image."""
-        import base64
-        from PIL import Image, ImageTk
-        import io
-        
         # Create new window
         image_window = ctk.CTkToplevel(self)
         image_window.title(f"Screenshot {screenshot_id}")
@@ -682,6 +864,7 @@ class ScreenshotViewer(ctk.CTkToplevel):
             )
             error_label.pack(pady=50)
 
+
 class Overlay(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -693,8 +876,8 @@ class Overlay(ctk.CTk):
         # Configure window
         self.title("Pixly")
         self.geometry("600x700")
-        self.overrideredirect(True)  # Remove window decorations
-        self.attributes('-topmost', True)  # Stay on top
+        self.overrideredirect(True)
+        self.attributes('-topmost', True)
         self.configure(fg_color=("gray90", "gray10"))
         
         # Add subtle transparency
@@ -702,6 +885,7 @@ class Overlay(ctk.CTk):
         
         # Make the window itself have rounded corners
         self.attributes('-transparentcolor', 'white')
+        
         # Configure grid
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -725,6 +909,7 @@ class Overlay(ctk.CTk):
         )
         self.header_frame.pack(fill="x", padx=15, pady=(15, 10))
         self.header_frame.pack_propagate(False)
+        
         # Close/Back button in top left
         self.header_button = ctk.CTkButton(
             self.header_frame,
@@ -739,6 +924,7 @@ class Overlay(ctk.CTk):
             text_color="white"
         )
         self.header_button.place(x=10, y=15)
+        
         # Title with icon
         self.title_label = ctk.CTkLabel(
             self.header_frame, 
@@ -749,7 +935,7 @@ class Overlay(ctk.CTk):
         self.title_label.pack(pady=15)
         
         # Main content area
-        self.content_frame = ctk.CTkFrame(self.frame,corner_radius=15)
+        self.content_frame = ctk.CTkFrame(self.frame, corner_radius=15)
         self.content_frame.pack(fill="both", expand=True, padx=15, pady=(0, 15))
         
         # Chat window (initially hidden)
@@ -759,7 +945,7 @@ class Overlay(ctk.CTk):
         self.settings_window = SettingsWindow(self.content_frame)
         
         # Buttons container
-        self.buttons_frame = ctk.CTkFrame(self.content_frame,corner_radius=15)
+        self.buttons_frame = ctk.CTkFrame(self.content_frame, corner_radius=15)
         self.buttons_frame.pack(fill="both", expand=True)
         
         # Create buttons
@@ -769,9 +955,9 @@ class Overlay(ctk.CTk):
             "#636363",
             "#222222"
         )
-        self.button2 = self.create_button("Settings", self.toggle_settings_window, "#636363","#222222")
-        self.button3 = self.create_button("Button 3", lambda: None, "#636363","#222222")
-        self.button4 = self.create_button("Button 4", lambda: None, "#636363","#222222")
+        self.button2 = self.create_button("Settings", self.toggle_settings_window, "#636363", "#222222")
+        self.button3 = self.create_button("Button 3", lambda: None, "#636363", "#222222")
+        self.button4 = self.create_button("Button 4", lambda: None, "#636363", "#222222")
         
         # Show buttons initially
         self.show_buttons()
@@ -809,41 +995,8 @@ class Overlay(ctk.CTk):
         x = self.winfo_x() + deltax
         y = self.winfo_y() + deltay
         self.geometry(f"+{x}+{y}")
-
-    def call_backend(self, endpoint, task_name):
-        # Disable buttons during processing
-        self.button_a.configure(state="disabled")
-        self.button_b.configure(state="disabled")
-        
-        # Run the request in a separate thread to avoid blocking UI
-        def make_request():
-            try:
-                response = requests.get(f"http://127.0.0.1:8000{endpoint}", timeout=5)
-                if response.status_code == 200:
-                    result = response.json()
-
-                    print(f"Task {task_name} result: {result}")
-                else:
-                    print(f"Error: Server returned {response.status_code}")
-            except requests.exceptions.RequestException as e:
-                print(f"Network error: {str(e)}")
-            except Exception as e:
-                print(f"Unexpected error: {str(e)}")
-            finally:
-                # Re-enable buttons after a short delay
-                self.after(1500, self.enable_buttons)
-                # Reset status after delay
-        
-        # Start the request in a separate thread
-        threading.Thread(target=make_request, daemon=True).start()
     
-    
-    def enable_buttons(self):
-        """Re-enable all buttons"""
-        self.button_a.configure(state="normal")
-        self.button_b.configure(state="normal")
-    
-    def create_button(self, text, command, fg_color,hv_color):
+    def create_button(self, text, command, fg_color, hv_color):
         return ctk.CTkButton(
             self.buttons_frame,
             text=text,
@@ -901,6 +1054,7 @@ class Overlay(ctk.CTk):
             hover_color=("red", "red")
         )
 
+
 def main():
     app = Overlay()
     
@@ -911,14 +1065,15 @@ def main():
             print("Overlay is now hidden (Ctrl+Alt+M to show)")
         else:
             app.deiconify()
-            app.lift()  # Bring to front
+            app.lift()
             print("Pixly is now active!")
     
     keyboard.add_hotkey('ctrl+alt+m', toggle_overlay)
     
-    app.withdraw()  # Start hidden
+    app.withdraw()
     print("Pixly initialized! Press Ctrl+Alt+M to toggle visibility")
     app.mainloop()
+
 
 if __name__ == "__main__":
     main()

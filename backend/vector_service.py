@@ -311,3 +311,7 @@ def list_available_games() -> List[str]:
     """List all games with knowledge in the vector database."""
     return vector_service.list_available_games()
 
+# At the END of backend/vector_service.py
+
+# Initialize the service
+vector_service = VectorService()
