@@ -53,6 +53,11 @@ def stop_screenshots():
     stop_screenshot_capture()
     return {"status": "ok", "message": "Screenshot capture stopped"}
 
+@app.post("/screenshots/latest")
+def latest_screenshots():
+    """Latest screenshot """
+    return {"status" : "ok"}
+
 @app.get("/screenshots/recent")
 def get_recent_screenshots_endpoint(limit: int = 10, application: str = None):
     """Get recent screenshots."""
