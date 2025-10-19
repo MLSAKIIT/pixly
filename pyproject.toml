@@ -26,6 +26,9 @@ dependencies = [
     "pandas>=2.0.0",
     "lxml>=4.9.0",
     "pytest>=8.4.2",
+    "agno>=2.1.8",
+    "google-genai>=1.45.0",
+    "sqlalchemy>=2.0.44",
 ]
 
 [project.optional-dependencies]

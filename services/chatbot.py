@@ -6,44 +6,126 @@ from services.screenshot import get_recent_screenshots, get_screenshot_by_id, ge
 from services.game_detection import detect_current_game
 from services.vector_service import search_knowledge
 import base64
+import PIL.Image
+import io
+from agno.agent import Agent
+from agno.models.google import Gemini
+from agno.db.sqlite import SqliteDb
+from agno.tools import tool
+from agno.media import Image
+from typing import Optional, Dict, Any
 
-system_prompt_file = open("PROMPTS.txt","r")
+system_prompt_file = open("PROMPTS.txt", "r")
 system_prompt = system_prompt_file.read()
 load_dotenv()
 
 # Configure Gemini
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'),)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite",system_instruction=system_prompt)
+genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
-def set_api_key(new_key: str):
-    """Update the Google API key at runtime and reinitialize the model."""
+@tool()
+def get_game_screenshots(limit: int = 5) -> str:
+    """Get recent game screenshots."""
+    try:
+        screenshots = get_recent_screenshots(limit=limit)
+        stats = get_screenshot_stats()
+        return {
+            "screenshots": screenshots,
+            "stats": stats
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@tool()
+def get_specific_screenshot(screenshot_id: str) -> str:
+    """Get a specific screenshot by ID."""
+    try:
+        return get_screenshot_by_id(screenshot_id)
+    except Exception as e:
+        return {"error": str(e)}
+
+@tool()
+def detect_game_context(message: str) -> str:
+    """Detect the current game from message."""
+    try:
+        return detect_current_game(message)
+    except Exception as e:
+        return {"error": str(e)}
+
+@tool()
+def search_game_knowledge(query: str) -> str:
+    """Search the knowledge base for game information."""
+    try:
+        return search_knowledge(query)
+    except Exception as e:
+        return {"error": str(e)}
+
+db = SqliteDb(db_file="chatbot.db")
+agent = Agent(
+    model=Gemini(
+        id="gemini-2.5-flash-lite",
+        api_key=os.getenv('GOOGLE_API_KEY')
+    ),
+    tools=[
+        get_game_screenshots,
+        get_specific_screenshot,
+        detect_game_context,
+        search_game_knowledge
+    ],
+    db=db,
+    add_history_to_context=True,
+    num_history_runs=3,
+    read_chat_history=True,
+    markdown=True,
+    enable_session_summaries=True,
+    store_media=True,
+    description=system_prompt
+)
+
+def set_api_key(new_key: str) -> bool:
+    """Update the Google API key at runtime."""
     try:
         if not new_key:
             raise ValueError("Empty API key")
         os.environ['GOOGLE_API_KEY'] = new_key
         genai.configure(api_key=new_key)
-        global model
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=system_prompt)
+        global agent
+        agent = Agent(
+            model=Gemini(
+                id="gemini-2.5-flash-lite",
+                api_key=new_key
+            ),
+            tools=[
+                get_game_screenshots,
+                get_specific_screenshot,
+                detect_game_context,
+                search_game_knowledge
+            ],
+            db=db,
+            add_history_to_context=True,
+            num_history_runs=3,
+            read_chat_history=True,
+            markdown=True,
+            enable_session_summaries=True,
+            store_media=True,
+            description=system_prompt
+        )
         return True
     except Exception as e:
         print(f"Error setting API key: {e}")
         return False
 
 async def chat_with_gemini(message: str, image_data: str = None):
+    """Process chat message with context awareness."""
     try:
-        # Detect current game
-        detected_game = detect_current_game(message)
+        # Detect current game context
+        game_context = detect_current_game(message)
         
-        # If image data is provided, use vision capabilities
+        run_params = {
+            "stream": True
+        }
+        
+        # Handle image input
         if image_data:
-            import PIL.Image
-            import io
-            
-            # Decode base64 image
-            image_bytes = base64.b64decode(image_data)
-            image = PIL.Image.open(io.BytesIO(image_bytes))
-            
-            # Enhanced message for image analysis
             enhanced_message = f"""
             {message}
             
@@ -52,62 +134,28 @@ async def chat_with_gemini(message: str, image_data: str = None):
             Focus on game mechanics, strategies, UI elements, or any gaming-related aspects visible in the screenshot.
             """
             
+            # Process image
+            image_bytes = base64.b64decode(image_data)
+            image = PIL.Image.open(io.BytesIO(image_bytes))
+            buf = io.BytesIO()
+            image.save(buf, format="PNG")
+            image_content = buf.getvalue()
+            run_params["images"] = [Image(content=image_content)]
+            message = enhanced_message
+            
             # Add game context if detected
-            if detected_game:
-                enhanced_message += f"\n\nDETECTED GAME: {detected_game.upper()}"
-            
-            # Generate content with image
-            response = model.generate_content([enhanced_message, image])
-            return {"response": response.text}
+            if game_context:
+                enhanced_message += f"\n\nDETECTED GAME: {game_context.upper()}"
         
-        # Check if user is asking about screenshots (existing functionality)
-        screenshot_keywords = ['screenshot', 'screen', 'capture', 'git', 'visual', 'see', 'show me']
-        if any(keyword in message.lower() for keyword in screenshot_keywords):
-            # Get recent screenshots
-            recent_screenshots = get_recent_screenshots(limit=5)
-            screenshot_stats = get_screenshot_stats()
-            
-            # Prepare screenshot context
-            screenshot_context = f"""
-            SCREENSHOT DATA AVAILABLE:
-            - Total screenshots stored: {screenshot_stats['total_screenshots']}
-            - Recent applications captured: {[app[0] for app in screenshot_stats['applications'][:5]]}
-            - Recent screenshots: {recent_screenshots}
-            
-            You can analyze these screenshots to help with gaming-related questions. 
-            The screenshots are automatically captured and show what applications the user was using.
-            """
-            
-            # Add screenshot context to the message
-            enhanced_message = f"{message}\n\n{screenshot_context}"
-            response = model.generate_content(enhanced_message)
-            return {"response": response.text}
-        else:
-            # Enhanced chat with game knowledge
-            enhanced_message = message
-            
-            # Add game context and knowledge if detected
-            if detected_game:
-                enhanced_message += f"\n\nDETECTED GAME: {detected_game.lower()}"
-                
-                # Search for relevant knowledge
-                try:
-                    knowledge_results = search_knowledge(detected_game, message)
-                    
-                    if knowledge_results:
-                        knowledge_context = "\n\nRELEVANT KNOWLEDGE FROM GAME DATABASE:\n"
-                        for i, result in enumerate(knowledge_results, 1):
-                            knowledge_context += f"\n{i}. {result['metadata'].get('title', 'Unknown Title')}\n"
-                            knowledge_context += f"   Source: {result['metadata'].get('content_type', 'unknown').upper()}\n"
-                            knowledge_context += f"   Content: {result['content'][:200]}...\n"
-                            knowledge_context += f"   URL: {result['metadata'].get('url', 'N/A')}\n"
-                        
-                        enhanced_message += knowledge_context
-                except Exception as e:
-                    print(f"Error searching knowledge: {e}")
-            
-            response = model.generate_content(enhanced_message)
-            return {"response": response.text}
+        # Run agent with parameters
+        response_content = ""
+        async for response in agent.arun(
+            message,
+            **run_params
+        ):
+            response_content += getattr(response, "content", str(response))
+        return {"response": response_content}
+        
     except Exception as e:
         print(e)
         return {"response": f"Error processing request: {str(e)}"}
