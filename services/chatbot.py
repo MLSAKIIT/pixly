@@ -1,6 +1,6 @@
 """ Includes gemini chatbot integration"""
 import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from services.screenshot import get_recent_screenshots, get_screenshot_by_id, get_screenshot_stats
 from services.game_detection import detect_current_game
