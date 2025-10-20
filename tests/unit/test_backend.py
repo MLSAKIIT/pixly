@@ -18,7 +18,7 @@ if project_root not in sys.path:
 
 try:
     from backend.backend import app
-    from backend.chatbot import chat_with_gemini, set_api_key
+    from services.chatbot import chat_with_gemini, set_api_key
     from services.screenshot import get_recent_screenshots, get_screenshot_by_id, get_screenshot_stats, delete_screenshot
     from services.game_detection import detect_current_game, get_available_games as get_detection_games
     from services.knowledge_manager import get_available_games as get_csv_games, validate_csv_structure
@@ -41,7 +41,7 @@ class TestBackendAPI:
         """Test successful chat endpoint."""
         mock_response = {"response": "Test response from Gemini"}
         
-        with patch('backend.backend.chat_with_gemini', return_value=mock_response) as mock_chat:
+        with patch('routers.chat.chat_with_gemini', return_value=mock_response) as mock_chat:
             response = client.post("/chat", json=sample_chat_message)
             
             assert response.status_code == 200
@@ -54,7 +54,7 @@ class TestBackendAPI:
         """Test chat endpoint with image data."""
         mock_response = {"response": "I can see the image"}
         
-        with patch('backend.backend.chat_with_gemini', return_value=mock_response) as mock_chat:
+        with patch('routers.chat.chat_with_gemini', return_value=mock_response) as mock_chat:
             response = client.post("/chat", json=sample_chat_message_with_image)
             
             assert response.status_code == 200
@@ -102,7 +102,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_screenshots_recent_endpoint(self, client, mock_screenshot_records):
         """Test recent screenshots endpoint."""
-        with patch('backend.backend.get_recent_screenshots', return_value=mock_screenshot_records) as mock_get:
+        with patch('routers.screenshot.get_recent_screenshots', return_value=mock_screenshot_records) as mock_get:
             response = client.get("/screenshots/recent")
             
             assert response.status_code == 200
@@ -117,7 +117,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_screenshots_recent_with_limit(self, client, mock_screenshot_records):
         """Test recent screenshots endpoint with custom limit."""
-        with patch('backend.backend.get_recent_screenshots', return_value=mock_screenshot_records[:2]) as mock_get:
+        with patch('routers.screenshot.get_recent_screenshots', return_value=mock_screenshot_records[:2]) as mock_get:
             response = client.get("/screenshots/recent?limit=2")
             
             assert response.status_code == 200
@@ -132,7 +132,7 @@ class TestBackendAPI:
         """Test recent screenshots endpoint with application filter."""
         filtered_records = [record for record in mock_screenshot_records if record[2] == 'minecraft.exe']
         
-        with patch('backend.backend.get_recent_screenshots', return_value=filtered_records) as mock_get:
+        with patch('routers.screenshot.get_recent_screenshots', return_value=filtered_records) as mock_get:
             response = client.get("/screenshots/recent?application=minecraft.exe")
             
             assert response.status_code == 200
@@ -144,7 +144,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_screenshot_by_id_endpoint(self, client, mock_screenshot_data):
         """Test get screenshot by ID endpoint."""
-        with patch('backend.backend.get_screenshot_by_id', return_value=mock_screenshot_data['image_data']) as mock_get:
+        with patch('routers.screenshot.get_screenshot_by_id', return_value=mock_screenshot_data['image_data']) as mock_get:
             response = client.get("/screenshots/123")
             
             assert response.status_code == 200
@@ -157,7 +157,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_screenshot_by_id_not_found(self, client):
         """Test get screenshot by ID endpoint when screenshot not found."""
-        with patch('backend.backend.get_screenshot_by_id', return_value=None) as mock_get:
+        with patch('routers.screenshot.get_screenshot_by_id', return_value=None) as mock_get:
             response = client.get("/screenshots/999")
             
             assert response.status_code == 200
@@ -176,7 +176,7 @@ class TestBackendAPI:
             'date_range': ['2024-01-01T10:00:00', '2024-01-01T12:00:00']
         }
         
-        with patch('backend.backend.get_screenshot_stats', return_value=mock_stats) as mock_get:
+        with patch('routers.screenshot.get_screenshot_stats', return_value=mock_stats) as mock_get:
             response = client.get("/screenshots/stats")
             
             assert response.status_code == 200
@@ -189,7 +189,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_delete_screenshot_endpoint(self, client):
         """Test delete screenshot endpoint."""
-        with patch('backend.backend.delete_screenshot', return_value=True) as mock_delete:
+        with patch('routers.screenshot.delete_screenshot', return_value=True) as mock_delete:
             response = client.delete("/screenshots/123")
             
             assert response.status_code == 200
@@ -202,7 +202,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_delete_screenshot_not_found(self, client):
         """Test delete screenshot endpoint when screenshot not found."""
-        with patch('backend.backend.delete_screenshot', return_value=False) as mock_delete:
+        with patch('routers.screenshot.delete_screenshot', return_value=False) as mock_delete:
             response = client.delete("/screenshots/999")
             
             assert response.status_code == 404
@@ -213,7 +213,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_game_detection_endpoint(self, client):
         """Test game detection endpoint."""
-        with patch('backend.backend.detect_current_game', return_value="minecraft") as mock_detect:
+        with patch('routers.game_detection.detect_current_game', return_value="minecraft") as mock_detect:
             response = client.post("/games/detect", json={"message": "How do I craft in minecraft?"})
             
             assert response.status_code == 200
@@ -226,7 +226,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_game_detection_endpoint_no_message(self, client):
         """Test game detection endpoint without message."""
-        with patch('backend.backend.detect_current_game', return_value="minecraft") as mock_detect:
+        with patch('routers.game_detection.detect_current_game', return_value="minecraft") as mock_detect:
             response = client.post("/games/detect", json={})
             
             assert response.status_code == 200
@@ -239,7 +239,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_game_detection_endpoint_no_game_detected(self, client):
         """Test game detection endpoint when no game is detected."""
-        with patch('backend.backend.detect_current_game', return_value=None) as mock_detect:
+        with patch('routers.game_detection.detect_current_game', return_value=None) as mock_detect:
             response = client.post("/games/detect", json={"message": "random text"})
             
             assert response.status_code == 200
@@ -256,9 +256,9 @@ class TestBackendAPI:
         mock_csv_games = ["minecraft", "black_myth_wukong"]
         mock_vector_games = ["minecraft", "elden_ring"]
         
-        with patch('backend.backend.get_detection_games', return_value=mock_detection_games) as mock_detect, \
-             patch('backend.backend.get_csv_games', return_value=mock_csv_games) as mock_csv, \
-             patch('backend.backend.list_available_games', return_value=mock_vector_games) as mock_vector:
+        with patch('routers.game_detection.get_detection_games', return_value=mock_detection_games) as mock_detect, \
+             patch('routers.game_detection.get_csv_games', return_value=mock_csv_games) as mock_csv, \
+             patch('routers.game_detection.list_available_games', return_value=mock_vector_games) as mock_vector:
             response = client.get("/games/list")
             
             assert response.status_code == 200
@@ -305,9 +305,9 @@ class TestBackendAPI:
         """Test add game knowledge endpoint."""
         mock_stats = {"wiki": 10, "youtube": 5, "forum": 15}
         
-        with patch('backend.backend.validate_csv_structure', return_value=(True, [])) as mock_validate, \
-             patch('backend.backend.add_game_knowledge', return_value=True) as mock_add, \
-             patch('backend.backend.get_game_stats', return_value=mock_stats) as mock_stats_func:
+        with patch('routers.game_detection.validate_csv_structure', return_value=(True, [])) as mock_validate, \
+             patch('routers.game_detection.add_game_knowledge', return_value=True) as mock_add, \
+             patch('routers.game_detection.get_game_stats', return_value=mock_stats) as mock_stats_func:
             response = client.post("/games/minecraft/knowledge/process")
             
             assert response.status_code == 200
@@ -322,8 +322,8 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_knowledge_add_endpoint_failure(self, client):
         """Test add game knowledge endpoint with failure."""
-        with patch('backend.backend.validate_csv_structure', return_value=(True, [])) as mock_validate, \
-             patch('backend.backend.add_game_knowledge', return_value=False) as mock_add:
+        with patch('routers.game_detection.validate_csv_structure', return_value=(True, [])) as mock_validate, \
+             patch('routers.game_detection.add_game_knowledge', return_value=False) as mock_add:
             response = client.post("/games/nonexistent_game/knowledge/process")
             
             assert response.status_code == 500
@@ -343,7 +343,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_knowledge_search_endpoint(self, client, mock_vector_search_results):
         """Test search knowledge endpoint."""
-        with patch('backend.backend.search_knowledge', return_value=mock_vector_search_results) as mock_search:
+        with patch('routers.game_detection.search_knowledge', return_value=mock_vector_search_results) as mock_search:
             response = client.post("/games/minecraft/knowledge/search", json={
                 "query": "How do I craft items?",
                 "limit": 5
@@ -361,7 +361,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_knowledge_search_endpoint_with_content_types(self, client, mock_vector_search_results):
         """Test search knowledge endpoint with content types."""
-        with patch('backend.backend.search_knowledge', return_value=mock_vector_search_results) as mock_search:
+        with patch('routers.game_detection.search_knowledge', return_value=mock_vector_search_results) as mock_search:
             response = client.post("/games/minecraft/knowledge/search", json={
                 "query": "How do I craft items?",
                 "content_types": ["wiki", "forum"],
@@ -388,7 +388,7 @@ class TestBackendAPI:
         """Test knowledge statistics endpoint."""
         mock_stats = {"wiki": 10, "youtube": 5, "forum": 15}
         
-        with patch('backend.backend.get_game_stats', return_value=mock_stats) as mock_get:
+        with patch('routers.game_detection.get_game_stats', return_value=mock_stats) as mock_get:
             response = client.get("/games/minecraft/knowledge/stats")
             
             assert response.status_code == 200
@@ -409,7 +409,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_api_key_update_endpoint(self, client, sample_api_key_request):
         """Test API key update endpoint."""
-        with patch('backend.backend.set_api_key', return_value=True) as mock_set, \
+        with patch('routers.settings.set_api_key', return_value=True) as mock_set, \
              patch('builtins.open', create=True) as mock_open, \
              patch('os.path.exists', return_value=True):
             response = client.post("/settings/api-key", json=sample_api_key_request)
@@ -424,7 +424,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_api_key_update_endpoint_failure(self, client, sample_api_key_request):
         """Test API key update endpoint with failure."""
-        with patch('backend.backend.set_api_key', return_value=False) as mock_set, \
+        with patch('routers.settings.set_api_key', return_value=False) as mock_set, \
              patch('builtins.open', create=True) as mock_open, \
              patch('os.path.exists', return_value=True):
             response = client.post("/settings/api-key", json=sample_api_key_request)
@@ -446,7 +446,7 @@ class TestBackendAPI:
     @pytest.mark.api
     def test_api_key_update_endpoint_exception(self, client, sample_api_key_request):
         """Test API key update endpoint with exception."""
-        with patch('backend.backend.set_api_key', side_effect=Exception("API Error")) as mock_set:
+        with patch('routers.settings.set_api_key', side_effect=Exception("API Error")) as mock_set:
             response = client.post("/settings/api-key", json=sample_api_key_request)
             
             assert response.status_code == 500
@@ -469,7 +469,7 @@ class TestBackendIntegration:
         """Test complete chat workflow through API."""
         mock_response = {"response": "Here's how to craft a sword in Minecraft..."}
         
-        with patch('backend.backend.chat_with_gemini', return_value=mock_response) as mock_chat:
+        with patch('routers.chat.chat_with_gemini', return_value=mock_response) as mock_chat:
             # Send chat request
             response = client.post("/chat", json=sample_chat_message)
             
@@ -483,27 +483,27 @@ class TestBackendIntegration:
     def test_full_screenshot_workflow(self, client, mock_screenshot_records, mock_screenshot_data):
         """Test complete screenshot workflow through API."""
         # Get recent screenshots
-        with patch('backend.backend.get_recent_screenshots', return_value=mock_screenshot_records):
+        with patch('routers.screenshot.get_recent_screenshots', return_value=mock_screenshot_records):
             response = client.get("/screenshots/recent")
             assert response.status_code == 200
             data = response.json()
             assert len(data["screenshots"]) == 3
         
         # Get screenshot by ID
-        with patch('backend.backend.get_screenshot_by_id', return_value=mock_screenshot_data['image_data']):
+        with patch('routers.screenshot.get_screenshot_by_id', return_value=mock_screenshot_data['image_data']):
             response = client.get("/screenshots/1")
             assert response.status_code == 200
             assert response.headers["content-type"] == "application/json"
         
         # Get screenshot stats
         mock_stats = {'total_screenshots': 3, 'applications': [], 'date_range': [None, None]}
-        with patch('backend.backend.get_screenshot_stats', return_value=mock_stats):
+        with patch('routers.screenshot.get_screenshot_stats', return_value=mock_stats):
             response = client.get("/screenshots/stats")
             assert response.status_code == 200
             assert response.json() == {"status": "ok", "stats": mock_stats}
         
         # Delete screenshot
-        with patch('backend.backend.delete_screenshot', return_value=True):
+        with patch('routers.screenshot.delete_screenshot', return_value=True):
             response = client.delete("/screenshots/1")
             assert response.status_code == 200
             assert response.json()["message"] == "Deleted screenshot 1"
@@ -513,13 +513,13 @@ class TestBackendIntegration:
     def test_full_knowledge_workflow(self, client, mock_vector_search_results):
         """Test complete knowledge workflow through API."""
         # Add knowledge
-        with patch('backend.backend.add_game_knowledge', return_value=True):
+        with patch('routers.game_detection.add_game_knowledge', return_value=True):
             response = client.post("/games/minecraft/knowledge/process")
             assert response.status_code == 200
             assert response.json()["status"] == "ok"
         
         # Search knowledge
-        with patch('backend.backend.search_knowledge', return_value=mock_vector_search_results):
+        with patch('routers.game_detection.search_knowledge', return_value=mock_vector_search_results):
             response = client.post("/games/minecraft/knowledge/search", json={
                 "query": "How do I craft items?",
                 "limit": 5
@@ -531,14 +531,14 @@ class TestBackendIntegration:
         
         # Get knowledge stats
         mock_stats = {"wiki": 10, "youtube": 5, "forum": 15}
-        with patch('backend.backend.get_game_stats', return_value=mock_stats):
+        with patch('routers.game_detection.get_game_stats', return_value=mock_stats):
             response = client.get("/games/minecraft/knowledge/stats")
             assert response.status_code == 200
             assert response.json() == {"status": "ok", "game_name": "minecraft", "stats": mock_stats}
         
         # List available games
         mock_games = ["minecraft", "elden_ring"]
-        with patch('backend.backend.list_available_games', return_value=mock_games):
+        with patch('routers.game_detection.list_available_games', return_value=mock_games):
             response = client.get("/games/list")
             assert response.status_code == 200
             data = response.json()
@@ -561,7 +561,7 @@ class TestBackendEdgeCases:
         long_message = "This is a very long message. " * 1000
         mock_response = {"response": "Long message processed"}
         
-        with patch('backend.backend.chat_with_gemini', return_value=mock_response):
+        with patch('routers.chat.chat_with_gemini', return_value=mock_response):
             response = client.post("/chat", json={"message": long_message})
             
             assert response.status_code == 200
@@ -574,7 +574,7 @@ class TestBackendEdgeCases:
         special_message = "Hello! 🎮 How do I craft? @#$%^&*()"
         mock_response = {"response": "Special characters handled"}
         
-        with patch('backend.backend.chat_with_gemini', return_value=mock_response):
+        with patch('routers.chat.chat_with_gemini', return_value=mock_response):
             response = client.post("/chat", json={"message": special_message})
             
             assert response.status_code == 200
@@ -592,7 +592,7 @@ class TestBackendEdgeCases:
     @pytest.mark.api
     def test_screenshot_endpoint_with_negative_id(self, client):
         """Test screenshot endpoint with negative ID."""
-        with patch('backend.backend.get_screenshot_by_id', return_value=None):
+        with patch('routers.screenshot.get_screenshot_by_id', return_value=None):
             response = client.get("/screenshots/-1")
             
             assert response.status_code == 200  # FastAPI accepts negative integers
@@ -601,7 +601,7 @@ class TestBackendEdgeCases:
     @pytest.mark.api
     def test_knowledge_search_with_empty_query(self, client):
         """Test knowledge search with empty query."""
-        with patch('backend.backend.search_knowledge', return_value=[]):
+        with patch('routers.game_detection.search_knowledge', return_value=[]):
             response = client.post("/games/minecraft/knowledge/search", json={
                 "query": "",
                 "limit": 5
@@ -618,7 +618,7 @@ class TestBackendEdgeCases:
         long_query = "This is a very long query. " * 100
         mock_results = []
         
-        with patch('backend.backend.search_knowledge', return_value=mock_results):
+        with patch('routers.game_detection.search_knowledge', return_value=mock_results):
             response = client.post("/games/minecraft/knowledge/search", json={
                 "query": long_query,
                 "limit": 5
@@ -643,7 +643,7 @@ class TestBackendEdgeCases:
         long_key = "a" * 10000
         mock_response = {"status": "ok", "message": "API key updated"}
         
-        with patch('backend.backend.set_api_key', return_value=True):
+        with patch('routers.settings.set_api_key', return_value=True):
             response = client.post("/settings/api-key", json={"api_key": long_key})
             
             assert response.status_code == 200
@@ -655,7 +655,7 @@ class TestBackendEdgeCases:
         """Test game detection with unicode message."""
         unicode_message = "How do I craft in minecraft? 🎮 中文测试"
         
-        with patch('backend.backend.detect_current_game', return_value="minecraft"):
+        with patch('routers.game_detection.detect_current_game', return_value="minecraft"):
             response = client.post("/games/detect", json={"message": unicode_message})
             
             assert response.status_code == 200
@@ -666,7 +666,7 @@ class TestBackendEdgeCases:
     @pytest.mark.api
     def test_csv_validation_with_special_characters(self, client):
         """Test CSV validation with special characters in game name."""
-        with patch('backend.backend.validate_csv_structure', return_value=(True, [])):
+        with patch('routers.game_detection.validate_csv_structure', return_value=(True, [])):
             response = client.get("/games/test-game_123/knowledge/validate")
             
             assert response.status_code == 200

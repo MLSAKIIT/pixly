@@ -76,7 +76,7 @@ class TestGameDetection:
     @pytest.mark.unit
     def test_detect_game_from_screenshots_success(self, mock_screenshot_records):
         """Test successful game detection from screenshots."""
-        with patch('backend.game_detection.get_recent_screenshots', return_value=mock_screenshot_records):
+        with patch('services.screenshot.get_recent_screenshots', return_value=mock_screenshot_records):
             detector = GameDetection()
             result = detector.detect_game_from_screenshots()
             
@@ -89,7 +89,7 @@ class TestGameDetection:
             (1, '2024-01-01T10:00:00', 'unknown.exe', 'Minecraft Launcher', 'hash1'),
         ]
         
-        with patch('backend.game_detection.get_recent_screenshots', return_value=mock_screenshots):
+        with patch('services.screenshot.get_recent_screenshots', return_value=mock_screenshots):
             detector = GameDetection()
             result = detector.detect_game_from_screenshots()
             
@@ -102,7 +102,7 @@ class TestGameDetection:
             (1, '2024-01-01T10:00:00', 'notepad.exe', 'Notepad', 'hash1'),
         ]
         
-        with patch('backend.game_detection.get_recent_screenshots', return_value=mock_screenshots):
+        with patch('services.screenshot.get_recent_screenshots', return_value=mock_screenshots):
             detector = GameDetection()
             result = detector.detect_game_from_screenshots()
             
@@ -111,7 +111,7 @@ class TestGameDetection:
     @pytest.mark.unit
     def test_detect_game_from_screenshots_exception(self):
         """Test game detection from screenshots with exception."""
-        with patch('backend.game_detection.get_recent_screenshots', side_effect=Exception("Screenshot error")):
+        with patch('services.screenshot.get_recent_screenshots', side_effect=Exception("Screenshot error")):
             detector = GameDetection()
             result = detector.detect_game_from_screenshots()
             
@@ -358,7 +358,7 @@ class TestGameDetectionIntegration:
         # Test with screenshot detection (both message and process fail)
         with patch.object(detector, 'detect_game_from_message', return_value=None), \
              patch('psutil.process_iter', return_value=[]), \
-             patch('backend.game_detection.get_recent_screenshots', return_value=mock_screenshot_records):
+             patch('services.screenshot.get_recent_screenshots', return_value=mock_screenshot_records):
             result = detector.detect_current_game("random question")
             assert result == 'minecraft'
     
@@ -393,7 +393,7 @@ class TestGameDetectionIntegration:
         mock_screenshots = [
             (1, '2024-01-01T10:00:00', 'unknown.exe', 'Test Game Window', 'hash1'),
         ]
-        with patch('backend.game_detection.get_recent_screenshots', return_value=mock_screenshots):
+        with patch('services.screenshot.get_recent_screenshots', return_value=mock_screenshots):
             result = detector.detect_game_from_screenshots()
             assert result == 'test_integration_game'
 

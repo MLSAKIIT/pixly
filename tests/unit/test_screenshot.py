@@ -40,8 +40,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_screenshot_capture_init(self, temp_dir, temp_db_path):
         """Test ScreenshotCapture initialization."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=b'test_key'):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=b'test_key'):
             
             capture = ScreenshotCapture(db_path=temp_db_path, interval=60)
             
@@ -60,7 +60,7 @@ class TestScreenshotCapture:
         with open(key_file, "wb") as f:
             f.write(test_key)
         
-        with patch('backend.screenshot.Fernet') as mock_fernet:
+        with patch('services.screenshot.Fernet') as mock_fernet:
             # Change working directory so production code finds the key
             cwd = os.getcwd()
             try:
@@ -73,8 +73,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_get_or_create_key_new(self, temp_dir):
         """Test creating new encryption key."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=b'new_key'):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=b'new_key'):
             
             # Change working directory so production code writes key into temp_dir
             cwd = os.getcwd()
@@ -92,8 +92,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_init_database(self, temp_dir, temp_db_path):
         """Test database initialization."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             
             # Verify database was created
@@ -158,8 +158,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_encrypt_decrypt_data(self, temp_dir, temp_db_path):
         """Test data encryption and decryption."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             mock_cipher = Mock()
             mock_cipher.encrypt.return_value = b'encrypted_data'
             mock_cipher.decrypt.return_value = b'original_data'
@@ -179,8 +179,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_calculate_hash(self, temp_dir, temp_db_path):
         """Test hash calculation."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             test_data = b'test_data'
             
@@ -194,8 +194,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_save_screenshot_success(self, temp_dir, temp_db_path, mock_screenshot_data):
         """Test successful screenshot saving."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             mock_cipher = Mock()
             mock_cipher.encrypt.return_value = b'encrypted_data'
             mock_fernet.return_value = mock_cipher
@@ -227,8 +227,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_save_screenshot_no_data(self, temp_dir, temp_db_path):
         """Test saving screenshot with no image data."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             window_info = {'application': 'test.exe', 'window_title': 'Test'}
             
@@ -239,8 +239,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_save_screenshot_error(self, temp_dir, temp_db_path, mock_screenshot_data):
         """Test saving screenshot with database error."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             
             mock_cipher = Mock()
             mock_cipher.encrypt.return_value = b'encrypted_data'
@@ -258,8 +258,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_capture_and_save(self, temp_dir, temp_db_path, mock_screenshot_data):
         """Test capture and save functionality."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
              patch.object(ScreenshotCapture, '_get_active_window_info', 
                          return_value=mock_screenshot_data['window_info']), \
              patch.object(ScreenshotCapture, '_capture_screenshot', 
@@ -283,8 +283,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_start_capture(self, temp_dir, temp_db_path):
         """Test starting screenshot capture."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
              patch('threading.Thread') as mock_thread:
             
             capture = ScreenshotCapture(db_path=temp_db_path)
@@ -296,8 +296,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_stop_capture(self, temp_dir, temp_db_path):
         """Test stopping screenshot capture."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             capture.running = True
             capture.thread = Mock()
@@ -311,8 +311,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_get_screenshots_with_filters(self, temp_dir, temp_db_path, mock_screenshot_records):
         """Test getting screenshots with various filters."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             
             # Insert test data
@@ -346,8 +346,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_get_screenshot_data(self, temp_dir, temp_db_path):
         """Test getting screenshot data by ID."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             mock_cipher = Mock()
             mock_cipher.decrypt.return_value = b'decrypted_image_data'
             mock_fernet.return_value = mock_cipher
@@ -376,8 +376,8 @@ class TestScreenshotCapture:
     @pytest.mark.unit
     def test_get_stats(self, temp_dir, temp_db_path, mock_screenshot_records):
         """Test getting screenshot statistics."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             
             # Insert test data
@@ -415,8 +415,8 @@ class TestScreenshotModuleFunctions:
     @pytest.mark.unit
     def test_start_screenshot_capture(self, temp_dir, temp_db_path):
         """Test starting screenshot capture via module function."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.screenshot_capture') as mock_capture:
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.screenshot_capture') as mock_capture:
             
             start_screenshot_capture(interval=45)
             
@@ -426,14 +426,14 @@ class TestScreenshotModuleFunctions:
     @pytest.mark.unit
     def test_stop_screenshot_capture(self, temp_dir, temp_db_path):
         """Test stopping screenshot capture via module function."""
-        with patch('backend.screenshot.screenshot_capture') as mock_capture:
+        with patch('services.screenshot.screenshot_capture') as mock_capture:
             stop_screenshot_capture()
             mock_capture.stop_capture.assert_called_once()
     
     @pytest.mark.unit
     def test_get_recent_screenshots(self, temp_dir, temp_db_path):
         """Test getting recent screenshots via module function."""
-        with patch('backend.screenshot.screenshot_capture') as mock_capture:
+        with patch('services.screenshot.screenshot_capture') as mock_capture:
             mock_capture.get_screenshots.return_value = [('test', 'data')]
             
             result = get_recent_screenshots(limit=5, application='test.exe')
@@ -444,7 +444,7 @@ class TestScreenshotModuleFunctions:
     @pytest.mark.unit
     def test_get_screenshot_by_id(self, temp_dir, temp_db_path):
         """Test getting screenshot by ID via module function."""
-        with patch('backend.screenshot.screenshot_capture') as mock_capture:
+        with patch('services.screenshot.screenshot_capture') as mock_capture:
             mock_capture.get_screenshot_data.return_value = b'image_data'
             
             result = get_screenshot_by_id(123)
@@ -455,7 +455,7 @@ class TestScreenshotModuleFunctions:
     @pytest.mark.unit
     def test_get_screenshot_stats(self, temp_dir, temp_db_path):
         """Test getting screenshot stats via module function."""
-        with patch('backend.screenshot.screenshot_capture') as mock_capture:
+        with patch('services.screenshot.screenshot_capture') as mock_capture:
             mock_stats = {'total_screenshots': 10, 'applications': []}
             mock_capture.get_stats.return_value = mock_stats
             
@@ -514,8 +514,8 @@ class TestScreenshotIntegration:
     @pytest.mark.integration
     def test_full_screenshot_workflow(self, temp_dir, temp_db_path, mock_screenshot_data):
         """Test complete screenshot capture and retrieval workflow."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
              patch.object(ScreenshotCapture, '_get_active_window_info', 
                          return_value=mock_screenshot_data['window_info']), \
              patch.object(ScreenshotCapture, '_capture_screenshot', 
@@ -556,8 +556,8 @@ class TestScreenshotIntegration:
     @pytest.mark.integration
     def test_screenshot_capture_threading(self, temp_dir, temp_db_path):
         """Test screenshot capture in threading environment."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()), \
              patch.object(ScreenshotCapture, '_get_active_window_info', 
                          return_value={'application': 'test.exe', 'window_title': 'Test', 'pid': 123}), \
              patch.object(ScreenshotCapture, '_capture_screenshot', 
@@ -585,8 +585,8 @@ class TestScreenshotEdgeCases:
     @pytest.mark.unit
     def test_screenshot_capture_with_invalid_image_data(self, temp_dir, temp_db_path):
         """Test screenshot capture with invalid image data."""
-        with patch('backend.screenshot.Fernet'), \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet'), \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             capture = ScreenshotCapture(db_path=temp_db_path)
             window_info = {'application': 'test.exe', 'window_title': 'Test', 'pid': 123}
             
@@ -602,8 +602,8 @@ class TestScreenshotEdgeCases:
     @pytest.mark.unit
     def test_concurrent_database_access(self, temp_dir, temp_db_path, mock_screenshot_data):
         """Test concurrent database access scenarios."""
-        with patch('backend.screenshot.Fernet') as mock_fernet, \
-             patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+        with patch('services.screenshot.Fernet') as mock_fernet, \
+             patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
             mock_cipher = Mock()
             mock_cipher.encrypt.return_value = b'encrypted_data'
             mock_fernet.return_value = mock_cipher

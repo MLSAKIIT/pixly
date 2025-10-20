@@ -1,14 +1,28 @@
 import os
+import sys
 import sqlite3
 import hashlib
 from datetime import datetime
 import threading
 import time
 import psutil
-import win32gui
-import win32process
 from PIL import ImageGrab
 from cryptography.fernet import Fernet
+
+# Platform-specific imports
+if sys.platform == 'win32':
+    import win32gui
+    import win32process
+elif sys.platform == 'darwin':
+    try:
+        from Quartz import (
+            CGWindowListCopyWindowInfo,
+            kCGWindowListOptionOnScreenOnly,
+            kCGNullWindowID
+        )
+        from AppKit import NSWorkspace
+    except ImportError:
+        print("Warning: pyobjc-framework-Quartz not installed. Window detection will be limited on macOS.")
 
 class ScreenshotCapture:
     def __init__(self, db_path="screenshots.db", interval=30):
@@ -74,27 +88,68 @@ class ScreenshotCapture:
     def _get_active_window_info(self):
         """Get information about the currently active window."""
         try:
-            # Get the active window
-            hwnd = win32gui.GetForegroundWindow()
-            window_title = win32gui.GetWindowText(hwnd)
-            
-            # Get process information
-            _, pid = win32process.GetWindowThreadProcessId(hwnd)
-            process = psutil.Process(pid)
-            application = process.name()
-            
-            return {
-                'application': application,
-                'window_title': window_title,
-                'pid': pid
-            }
+            if sys.platform == 'win32':
+                return self._get_active_window_info_windows()
+            elif sys.platform == 'darwin':
+                return self._get_active_window_info_macos()
+            else:
+                return self._get_default_window_info()
         except Exception as e:
             print(f"Error getting window info: {e}")
-            return {
-                'application': 'Unknown',
-                'window_title': 'Unknown',
-                'pid': 0
-            }
+            return self._get_default_window_info()
+
+    def _get_active_window_info_windows(self):
+        """Get active window info on Windows."""
+        hwnd = win32gui.GetForegroundWindow()
+        window_title = win32gui.GetWindowText(hwnd)
+
+        # Get process information
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        process = psutil.Process(pid)
+        application = process.name()
+
+        return {
+            'application': application,
+            'window_title': window_title,
+            'pid': pid
+        }
+
+    def _get_active_window_info_macos(self):
+        """Get active window info on macOS."""
+        workspace = NSWorkspace.sharedWorkspace()
+        active_app = workspace.activeApplication()
+
+        application = active_app['NSApplicationName']
+        pid = active_app['NSApplicationProcessIdentifier']
+
+        # Get window title from window list
+        window_title = 'Unknown'
+        try:
+            window_list = CGWindowListCopyWindowInfo(
+                kCGWindowListOptionOnScreenOnly,
+                kCGNullWindowID
+            )
+            for window in window_list:
+                if window.get('kCGWindowOwnerPID') == pid:
+                    window_title = window.get('kCGWindowName', 'Unknown')
+                    if window_title and window_title != 'Unknown':
+                        break
+        except Exception as e:
+            print(f"Error getting window title: {e}")
+
+        return {
+            'application': application,
+            'window_title': window_title,
+            'pid': pid
+        }
+
+    def _get_default_window_info(self):
+        """Return default window info when platform detection fails."""
+        return {
+            'application': 'Unknown',
+            'window_title': 'Unknown',
+            'pid': 0
+        }
     
     def _capture_screenshot(self):
         """Capture a screenshot and return the image data."""

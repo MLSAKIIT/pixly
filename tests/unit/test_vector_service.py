@@ -37,7 +37,7 @@ class TestVectorService:
     def test_vector_service_init(self, temp_vector_db_dir):
         """Test VectorService initialization."""
         with patch('chromadb.PersistentClient') as mock_chroma, \
-             patch('backend.vector_service.SentenceTransformer') as mock_transformer:
+             patch('services.vector_service.SentenceTransformer') as mock_transformer:
             
             service = VectorService(vector_db_dir=temp_vector_db_dir)
             
@@ -64,7 +64,7 @@ class TestVectorService:
     def test_vector_service_init_transformer_error(self, temp_vector_db_dir):
         """Test VectorService initialization with SentenceTransformer error."""
         with patch('chromadb.PersistentClient'), \
-             patch('backend.vector_service.SentenceTransformer', side_effect=Exception("Transformer error")):
+             patch('services.vector_service.SentenceTransformer', side_effect=Exception("Transformer error")):
             
             service = VectorService(vector_db_dir=temp_vector_db_dir)
             
@@ -212,7 +212,7 @@ class TestVectorService:
     @pytest.mark.unit
     def test_add_game_knowledge_success(self, mock_knowledge_data, mock_chroma_client, mock_chroma_collection, mock_embedding_model):
         """Test successful game knowledge addition."""
-        with patch('backend.vector_service.process_game_knowledge', return_value=mock_knowledge_data) as mock_process:
+        with patch('services.vector_service.process_game_knowledge', return_value=mock_knowledge_data) as mock_process:
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = mock_embedding_model
@@ -230,7 +230,7 @@ class TestVectorService:
     @pytest.mark.unit
     def test_add_game_knowledge_no_client(self, mock_knowledge_data):
         """Test adding game knowledge without ChromaDB client."""
-        with patch('backend.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
+        with patch('services.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
             service = VectorService()
             service.chroma_client = None
             
@@ -241,7 +241,7 @@ class TestVectorService:
     @pytest.mark.unit
     def test_add_game_knowledge_no_model(self, mock_knowledge_data, mock_chroma_client):
         """Test adding game knowledge without embedding model."""
-        with patch('backend.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
+        with patch('services.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = None
@@ -255,7 +255,7 @@ class TestVectorService:
         """Test adding game knowledge with empty knowledge data."""
         empty_knowledge = {'wiki': [], 'youtube': [], 'forum': []}
         
-        with patch('backend.vector_service.process_game_knowledge', return_value=empty_knowledge):
+        with patch('services.vector_service.process_game_knowledge', return_value=empty_knowledge):
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = mock_embedding_model
@@ -268,7 +268,7 @@ class TestVectorService:
     @pytest.mark.unit
     def test_add_game_knowledge_error(self, mock_knowledge_data):
         """Test adding game knowledge with error."""
-        with patch('backend.vector_service.process_game_knowledge', side_effect=Exception("Process error")):
+        with patch('services.vector_service.process_game_knowledge', side_effect=Exception("Process error")):
             service = VectorService()
             
             result = service.add_game_knowledge('test_game')
@@ -554,7 +554,7 @@ class TestVectorServiceIntegration:
     @pytest.mark.integration
     def test_full_knowledge_workflow(self, mock_knowledge_data, mock_chroma_client, mock_embedding_model):
         """Test complete knowledge addition and search workflow."""
-        with patch('backend.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
+        with patch('services.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = mock_embedding_model
@@ -585,7 +585,7 @@ class TestVectorServiceIntegration:
     @pytest.mark.integration
     def test_knowledge_lifecycle(self, mock_knowledge_data, mock_chroma_client, mock_embedding_model):
         """Test complete knowledge lifecycle (add, search, delete)."""
-        with patch('backend.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
+        with patch('services.vector_service.process_game_knowledge', return_value=mock_knowledge_data):
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = mock_embedding_model
@@ -657,7 +657,7 @@ class TestVectorServiceEdgeCases:
             'forum': [{'content': 'Valid content', 'title': 'Test'}]
         }
         
-        with patch('backend.vector_service.process_game_knowledge', return_value=malformed_knowledge):
+        with patch('services.vector_service.process_game_knowledge', return_value=malformed_knowledge):
             service = VectorService()
             service.chroma_client = mock_chroma_client
             service.embedding_model = mock_embedding_model
