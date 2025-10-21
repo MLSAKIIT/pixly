@@ -181,7 +181,7 @@ pixly/
 
 - **UI/Frontend**: CustomTkinter (modern theming and widgets for Python GUIs)
 - **API/Backend**: FastAPI (async Python web framework) + Uvicorn (ASGI server)
-- **AI**: Google Gemini 2.5 Flash Lite via `google-generativeai`
+- **AI**: Google Gemini 2.5 Flash Lite via `google-genai`SDK.
 - **RAG**: Chroma (persistent local vector DB) + sentence-transformers (embeddings)
 - **Data**: CSV-based per-game knowledge; SQLite for screenshots; Fernet for encryption
 - **System**: psutil + pywin32 for Windows process/window info; Pillow for imaging

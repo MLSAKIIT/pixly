@@ -267,7 +267,7 @@ def mock_embedding_model():
 @pytest.fixture(autouse=True)
 def patch_fernet_generate_key():
     """Ensure Fernet.generate_key returns bytes in tests that don't patch it explicitly."""
-    with patch('backend.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
+    with patch('services.screenshot.Fernet.generate_key', return_value=RealFernet.generate_key()):
         yield
 
 
