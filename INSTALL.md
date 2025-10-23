@@ -58,9 +58,9 @@ cd pixly
 
 ### macOS Setup
 
-#### Prerequisites: Tkinter Support
+#### Prerequisites: CustomTkinter Support
 
-Pixly requires Tkinter for the GUI overlay. If you're using `pyenv`, you need to install Python with Tkinter support:
+Pixly uses CustomTkinter for the GUI overlay, which requires the underlying Tkinter library to be available in your Python installation. If you're using `pyenv`, you need to install Python with Tkinter support:
 
 1. **Install tcl-tk via Homebrew**:
 ```bash
@@ -68,13 +68,6 @@ brew install tcl-tk
 ```
 
 2. **Reinstall Python 3.11+ with Tkinter support**:
-```bash
-# Use the provided script
-chmod +x reinstall_python_tkinter.sh
-./reinstall_python_tkinter.sh
-```
-
-Or manually:
 ```bash
 export PATH="/opt/homebrew/opt/tcl-tk/bin:$PATH"
 export LDFLAGS="-L/opt/homebrew/opt/tcl-tk/lib"
@@ -85,11 +78,11 @@ export PYTHON_CONFIGURE_OPTS="--with-tcltk-includes='-I/opt/homebrew/opt/tcl-tk/
 pyenv install 3.11.7 --force
 ```
 
-3. **Verify Tkinter is working**:
+3. **Verify the underlying Tkinter library is working**:
 ```bash
 python3 -m tkinter
 ```
-If a small window appears, Tkinter is working correctly!
+If a small window appears, Tkinter is working correctly and CustomTkinter will be able to use it!
 
 4. **Continue with Manual Setup below**
 
@@ -147,13 +140,13 @@ uv run overlay.py
 
 ### macOS: "ModuleNotFoundError: No module named '_tkinter'"
 
-This error occurs when Python doesn't have Tkinter support. Follow the **macOS Setup** section above to reinstall Python with Tkinter.
+This error occurs when Python doesn't have the underlying Tkinter library, which is required for CustomTkinter to function. Follow the **macOS Setup** section above to reinstall Python with Tkinter support.
 
 Quick fix:
 ```bash
-brew install tcl-tk
-chmod +x reinstall_python_tkinter.sh
-./reinstall_python_tkinter.sh
+brew install python-tk@3.11
+# Then reinstall dependencies
+uv sync
 ```
 
 ### macOS: Platform-specific dependencies
