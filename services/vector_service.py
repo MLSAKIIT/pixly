@@ -293,21 +293,3 @@ class VectorService:
 
 # Global instance
 vector_service = VectorService()
-
-def add_game_knowledge(game_name: str) -> bool:
-    """Add all knowledge for a game to the vector database."""
-    return vector_service.add_game_knowledge(game_name)
-
-def search_knowledge(game_name: str, query: str, content_types: List[str] = None, 
-                    limit: int = 5) -> List[Dict]:
-    """Search knowledge base for relevant information."""
-    return vector_service.search_knowledge(game_name, query, content_types, limit)
-
-def get_game_stats(game_name: str) -> Dict[str, int]:
-    """Get statistics for a game's knowledge base."""
-    return vector_service.get_game_stats(game_name)
-
-def list_available_games() -> List[str]:
-    """List all games with knowledge in the vector database."""
-    return vector_service.list_available_games()
-

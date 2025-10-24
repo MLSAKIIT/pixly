@@ -4,7 +4,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from services.screenshot import get_recent_screenshots, get_screenshot_by_id, get_screenshot_stats
 from services.game_detection import detect_current_game
-from services.vector_service import search_knowledge
+from services import vector_service
 import base64
 
 system_prompt_file = open("PROMPTS.txt","r")
@@ -92,7 +92,7 @@ async def chat_with_gemini(message: str, image_data: str = None):
                 
                 # Search for relevant knowledge
                 try:
-                    knowledge_results = search_knowledge(detected_game, message)
+                    knowledge_results = vector_service.search_knowledge(detected_game, message)
                     
                     if knowledge_results:
                         knowledge_context = "\n\nRELEVANT KNOWLEDGE FROM GAME DATABASE:\n"

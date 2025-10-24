@@ -207,52 +207,6 @@ async def clear_chat_history(game: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/history/{game}/stats")
-async def get_chat_stats(game: str):
-    """
-    Get statistics about chat history for a game
-    
-    Example: GET /chat/history/minecraft/stats
-    """
-    try:
-        stats = chat_history_manager.get_stats(game)
-        return {
-            "game": game,
-            "stats": stats
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/history/games")
-async def list_games_with_history():
-    """
-    List all games that have chat history
-    
-    Example: GET /chat/history/games
-    """
-    try:
-        collections = chat_history_manager.client.list_collections()
-        
-        games_with_history = []
-        for collection in collections:
-            if collection.name.endswith("_chat_history"):
-                game_name = collection.name.replace("_chat_history", "").replace("_", " ").title()
-                stats = chat_history_manager.get_stats(game_name)
-                games_with_history.append({
-                    "game": game_name,
-                    "collection_name": collection.name,
-                    "total_messages": stats.get("total_messages", 0)
-                })
-        
-        return {
-            "games": games_with_history,
-            "total_games": len(games_with_history)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/settings/history")
 async def update_history_settings(max_history: int):
     """
