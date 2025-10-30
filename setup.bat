@@ -65,7 +65,7 @@ set "UV_BIN="
 where uv >nul 2>nul && set "UV_BIN=uv"
 if defined UV_BIN goto :have_uv
 echo uv not found. Installing uv (via official installer)...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { irm https://astral.sh/uv/install.ps1 ^| iex } catch { exit 1 }"
+powershell -NoProfile -Command "$env:PATH=\"$env:LOCALAPPDATA\Programs\uv\;$env:PATH\"; iex (irm https://astral.sh/uv/install.ps1)"
 if errorlevel 1 (
   echo uv install script failed. Attempting install via pip...
   %PY_CMD% -m pip install --user uv
