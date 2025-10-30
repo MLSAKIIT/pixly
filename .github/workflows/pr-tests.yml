@@ -12,7 +12,7 @@ jobs:
     - name: Checkout PR Branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.ref }}
+        ref: ${{ github.event.pull_request.head.sha }}
         
     - name: Install uv
       uses: astral-sh/setup-uv@v2
