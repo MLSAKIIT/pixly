@@ -1,6 +1,6 @@
 from services.game_detection import detect_current_game, get_available_games as get_detection_games
 from services.knowledge_manager import get_available_games as get_csv_games, validate_csv_structure
-from services.vector_service import add_game_knowledge, search_knowledge, get_game_stats, list_available_games
+from services.vector_service import vector_service
 from schemas.game_detection import GameDetectionRequest
 from schemas.knowledge_search import KnowledgeSearchRequest
 from fastapi import APIRouter,HTTPException
@@ -26,7 +26,7 @@ def list_games():
     try:
         detection_games = get_detection_games()
         csv_games = get_csv_games()
-        vector_games = list_available_games()
+        vector_games = vector_service.list_available_games()
         
         return {
             "status": "ok",
@@ -48,9 +48,9 @@ def process_game_knowledge(game_name: str):
             raise HTTPException(status_code=400, detail=f"Invalid CSV structure: {errors}")
         
         # Process and add to vector database
-        success = add_game_knowledge(game_name)
+        success = vector_service.add_game_knowledge(game_name)
         if success:
-            stats = get_game_stats(game_name)
+            stats = vector_service.get_game_stats(game_name)
             return {
                 "status": "ok",
                 "message": f"Successfully processed knowledge for {game_name}",
@@ -67,7 +67,7 @@ def process_game_knowledge(game_name: str):
 def search_game_knowledge(game_name: str, request: KnowledgeSearchRequest):
     """Search knowledge base for a specific game."""
     try:
-        results = search_knowledge(
+        results = vector_service.search_knowledge(
             game_name=game_name,
             query=request.query,
             content_types=request.content_types,
@@ -88,7 +88,7 @@ def search_game_knowledge(game_name: str, request: KnowledgeSearchRequest):
 def get_game_knowledge_stats(game_name: str):
     """Get statistics for a game's knowledge base."""
     try:
-        stats = get_game_stats(game_name)
+        stats = vector_service.get_game_stats(game_name)
         return {
             "status": "ok",
             "game_name": game_name,
