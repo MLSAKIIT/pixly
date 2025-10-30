@@ -293,3 +293,5 @@ class VectorService:
 
 # Global instance
 vector_service = VectorService()
+def search_knowledge(game_name: str, query: str, content_types: List[str] = None, limit: int = 5) -> List[Dict]:
+    return vector_service.search_knowledge(game_name, query, content_types, limit)
