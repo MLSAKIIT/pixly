@@ -17,7 +17,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 try:
-    from backend.chatbot import set_api_key, chat_with_gemini
+    from services.chatbot import set_api_key, chat_with_gemini
 except ImportError as e:
     pytest.skip(f"Chatbot module not available: {e}", allow_module_level=True)
 
@@ -28,8 +28,8 @@ class TestSetApiKey:
     @pytest.mark.unit
     def test_set_api_key_success(self, mock_environment_variables):
         """Test successful API key setting."""
-        with patch('backend.chatbot.genai.configure') as mock_configure, \
-             patch('backend.chatbot.genai.GenerativeModel') as mock_model:
+        with patch('services.chatbot.genai.configure') as mock_configure, \
+             patch('services.chatbot.genai.GenerativeModel') as mock_model:
             
             result = set_api_key("test_api_key_12345")
             
@@ -54,7 +54,7 @@ class TestSetApiKey:
     @pytest.mark.unit
     def test_set_api_key_exception(self, mock_environment_variables):
         """Test API key setting with exception."""
-        with patch('backend.chatbot.genai.configure', side_effect=Exception("API Error")):
+        with patch('services.chatbot.genai.configure', side_effect=Exception("API Error")):
             result = set_api_key("test_key")
             
             assert result is False
@@ -70,8 +70,8 @@ class TestChatWithGemini:
         mock_response = Mock()
         mock_response.text = "Test response from Gemini"
         
-        with patch('backend.chatbot.detect_current_game', return_value=None) as mock_detect, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
+        with patch('services.game_detection.detect_current_game', return_value=None) as mock_detect, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
             
             result = await chat_with_gemini("Hello, how are you?")
             
@@ -87,8 +87,8 @@ class TestChatWithGemini:
         mock_response = Mock()
         mock_response.text = "I can see a test image"
         
-        with patch('backend.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate, \
+        with patch('services.game_detection.detect_current_game', return_value="minecraft") as mock_detect, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate, \
              patch('PIL.Image.open') as mock_image_open, \
              patch('base64.b64decode', return_value=b'decoded_image_data') as mock_b64decode:
             
@@ -121,10 +121,10 @@ class TestChatWithGemini:
             'applications': [('minecraft.exe', 1), ('chrome.exe', 1)]
         }
         
-        with patch('backend.chatbot.detect_current_game', return_value=None) as mock_detect, \
-             patch('backend.chatbot.get_recent_screenshots', return_value=mock_screenshots) as mock_recent, \
-             patch('backend.chatbot.get_screenshot_stats', return_value=mock_stats) as mock_stats_func, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
+        with patch('services.game_detection.detect_current_game', return_value=None) as mock_detect, \
+             patch('services.chatbot.get_recent_screenshots', return_value=mock_screenshots) as mock_recent, \
+             patch('services.chatbot.get_screenshot_stats', return_value=mock_stats) as mock_stats_func, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
             
             result = await chat_with_gemini("Show me my recent screenshots")
             
@@ -155,9 +155,9 @@ class TestChatWithGemini:
             }
         ]
         
-        with patch('backend.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
-             patch('backend.chatbot.search_knowledge', return_value=mock_knowledge_results) as mock_search, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
+        with patch('services.game_detection.detect_current_game', return_value="minecraft") as mock_detect, \
+             patch('services.vector_service.search_knowledge', return_value=mock_knowledge_results) as mock_search, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
             
             result = await chat_with_gemini("How do I craft items?")
             
@@ -178,9 +178,9 @@ class TestChatWithGemini:
         mock_response = Mock()
         mock_response.text = "I can help with Minecraft"
         
-        with patch('backend.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
-             patch('backend.chatbot.search_knowledge', side_effect=Exception("Search error")) as mock_search, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
+        with patch('services.game_detection.detect_current_game', return_value="minecraft") as mock_detect, \
+             patch('services.vector_service.search_knowledge', side_effect=Exception("Search error")) as mock_search, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
             
             result = await chat_with_gemini("How do I craft items?")
             
@@ -196,7 +196,7 @@ class TestChatWithGemini:
     @pytest.mark.asyncio
     async def test_chat_with_gemini_exception_handling(self, mock_environment_variables):
         """Test chat functionality with exception handling."""
-        with patch('backend.chatbot.detect_current_game', side_effect=Exception("Detection error")):
+        with patch('services.game_detection.detect_current_game', side_effect=Exception("Detection error")):
             result = await chat_with_gemini("Hello")
             
             assert "response" in result
@@ -206,7 +206,7 @@ class TestChatWithGemini:
     @pytest.mark.asyncio
     async def test_chat_with_gemini_image_processing_error(self, mock_environment_variables):
         """Test chat functionality when image processing fails."""
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
+        with patch('services.game_detection.detect_current_game', return_value=None), \
              patch('base64.b64decode', side_effect=Exception("Decode error")):
             
             result = await chat_with_gemini("What do you see?", "invalid_base64")
@@ -218,8 +218,8 @@ class TestChatWithGemini:
     @pytest.mark.asyncio
     async def test_chat_with_gemini_gemini_api_error(self, mock_environment_variables):
         """Test chat functionality when Gemini API fails."""
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
-             patch('backend.chatbot.model.generate_content', side_effect=Exception("API Error")):
+        with patch('services.chatbot.detect_current_game', return_value=None), \
+             patch('services.chatbot.model.generate_content', side_effect=Exception("API Error")):
             
             result = await chat_with_gemini("Hello")
             
@@ -248,9 +248,9 @@ class TestChatbotIntegration:
             }
         ]
         
-        with patch('backend.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
-             patch('backend.chatbot.search_knowledge', return_value=mock_knowledge) as mock_search, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
+        with patch('services.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
+             patch('services.vector_service.search_knowledge', return_value=mock_knowledge) as mock_search, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate:
             
             result = await chat_with_gemini("How do I craft a diamond sword?")
             
@@ -274,8 +274,8 @@ class TestChatbotIntegration:
         mock_response = Mock()
         mock_response.text = "I can see you're playing Minecraft and need help with crafting"
         
-        with patch('backend.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response) as mock_generate, \
+        with patch('services.chatbot.detect_current_game', return_value="minecraft") as mock_detect, \
+             patch('services.chatbot.model.generate_content', return_value=mock_response) as mock_generate, \
              patch('PIL.Image.open') as mock_image_open, \
              patch('base64.b64decode', return_value=b'decoded_image_data'):
             
@@ -304,8 +304,8 @@ class TestChatbotEdgeCases:
         mock_response = Mock()
         mock_response.text = "Empty message received"
         
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response):
+        with patch('services.chatbot.detect_current_game', return_value=None), \
+             patch('services.chatbot.model.generate_content', return_value=mock_response):
             
             result = await chat_with_gemini("")
             
@@ -319,8 +319,8 @@ class TestChatbotEdgeCases:
         mock_response = Mock()
         mock_response.text = "Long message processed"
         
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response):
+        with patch('services.chatbot.detect_current_game', return_value=None), \
+             patch('services.chatbot.model.generate_content', return_value=mock_response):
             
             result = await chat_with_gemini(long_message)
             
@@ -334,8 +334,8 @@ class TestChatbotEdgeCases:
         mock_response = Mock()
         mock_response.text = "Special characters handled"
         
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response):
+        with patch('services.chatbot.detect_current_game', return_value=None), \
+             patch('services.chatbot.model.generate_content', return_value=mock_response):
             
             result = await chat_with_gemini(special_message)
             
@@ -351,10 +351,10 @@ class TestChatbotEdgeCases:
         mock_screenshots = [(1, '2024-01-01T10:00:00', 'game.exe', 'Game', 'hash1')]
         mock_stats = {'total_screenshots': 1, 'applications': [('game.exe', 1)]}
         
-        with patch('backend.chatbot.detect_current_game', return_value=None), \
-             patch('backend.chatbot.get_recent_screenshots', return_value=mock_screenshots), \
-             patch('backend.chatbot.get_screenshot_stats', return_value=mock_stats), \
-             patch('backend.chatbot.model.generate_content', return_value=mock_response):
+        with patch('services.chatbot.detect_current_game', return_value=None), \
+             patch('services.chatbot.get_recent_screenshots', return_value=mock_screenshots), \
+             patch('services.chatbot.get_screenshot_stats', return_value=mock_stats), \
+             patch('services.chatbot.model.generate_content', return_value=mock_response):
             
             # Test various screenshot keywords
             keywords = ['screenshot', 'screen', 'capture', 'visual', 'see', 'show me']
